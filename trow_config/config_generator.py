@@ -4,7 +4,8 @@ import os
 from pathlib import Path
 
 import boto3
-from configuration import RegistryConfig, RegistryType
+
+from trow_config.configuration import RegistryConfig, RegistryType
 
 
 def _retrieve_value(configuration: dict) -> str:
