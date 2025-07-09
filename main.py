@@ -35,7 +35,7 @@ def main() -> None:
     trow_configuration: dict = generate_trow_configuration(registries)
 
     if kubernetes_client.check_if_secret_exists(
-        config.SECRET_NAME,
+        config.NAMESPACE,
         config.SECRET_NAME,
     ):
         kubernetes_client.update_trow_configuration_secret(
