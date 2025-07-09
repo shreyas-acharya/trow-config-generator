@@ -36,7 +36,7 @@ def generate_trow_configuration(registries: list[RegistryConfig]) -> dict:
     """Generate the trow configuration."""
     trow_configuration: dict = {
         "registry_proxies": {"registries": []},
-        "image_validation": {"default": "Allow", "allow": []},
+        "image_validation": {"default": "Allow", "allow": [], "deny": []},
     }
     for registry in registries:
         if registry.registry_type == RegistryType.DOCKER:
