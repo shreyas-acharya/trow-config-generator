@@ -13,7 +13,7 @@ def _retrieve_value(configuration: dict) -> str:
     if len(configuration) != 1:
         error = ValueError(
             "Invalid configuration. Exactly one value from the following"
-            " keys must be provided: value, file, env"
+            " keys must be provided: value, file, env",
         )
         raise error
 
@@ -45,10 +45,10 @@ def generate_trow_configuration(registries: list[RegistryConfig]) -> dict:
                     "alias": registry.alias,
                     "host": registry.host,
                     "username": _retrieve_value(
-                        registry.auth_configuration["username"]
+                        registry.auth_configuration["username"],
                     ),
                     "password": _retrieve_value(
-                        registry.auth_configuration["password"]
+                        registry.auth_configuration["password"],
                     ),
                 },
             )
@@ -56,22 +56,14 @@ def generate_trow_configuration(registries: list[RegistryConfig]) -> dict:
             RegistryType.ECR_PUBLIC,
             RegistryType.ECR,
         ]:
-            with Path.open(
-                Path(
-                    _retrieve_value(
-                        registry.auth_configuration["web_identity_token_file"]
-                    )
-                ),
-                encoding="utf-8",
-            ) as file:
-                token = file.read()
-
             credentials = boto3.client("sts").assume_role_with_web_identity(
                 RoleArn=_retrieve_value(registry.auth_configuration["role_arn"]),
                 RoleSessionName=_retrieve_value(
-                    registry.auth_configuration["role_session_name"]
+                    registry.auth_configuration["role_session_name"],
                 ),
-                WebIdentityToken=token,
+                WebIdentityToken=_retrieve_value(
+                    registry.auth_configuration["web_identity_token_file"],
+                ),
             )
 
             if registry.registry_type == RegistryType.ECR_PUBLIC:
@@ -101,8 +93,8 @@ def generate_trow_configuration(registries: list[RegistryConfig]) -> dict:
                 )
                 response = client.get_authorization_token(
                     registryIds=[
-                        _retrieve_value(registry.auth_configuration["registry_id"])
-                    ]
+                        _retrieve_value(registry.auth_configuration["registry_id"]),
+                    ],
                 )
                 trow_configuration["registry_proxies"]["registries"].append(
                     {
