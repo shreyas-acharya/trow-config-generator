@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "trow-config-generator"
+version = "0.1.0"
+description = ""
+authors = ["shreyas-acharya <acharyashreyas14@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+boto3 = "^1.39.3"
+kubernetes = "^33.1.0"
+pydantic = "^2.11.7"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
