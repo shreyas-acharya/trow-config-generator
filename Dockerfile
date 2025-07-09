@@ -16,7 +16,7 @@ FROM cgr.dev/chainguard/python:latest
 ARG WORKDIR
 WORKDIR ${WORKDIR}
 COPY --from=builder ${WORKDIR}/packages/ .
-COPY registry_auth/ registry_auth/
+COPY trow_config/ trow_config/
 COPY main.py .
 ENTRYPOINT ["python3", "main.py"]
 
