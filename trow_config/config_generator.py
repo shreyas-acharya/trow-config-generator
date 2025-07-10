@@ -4,6 +4,7 @@ Supports Docker, ECR, and ECR Public registries with appropriate
 authentication.
 """
 
+import base64
 import logging
 import os
 from pathlib import Path
@@ -154,12 +155,14 @@ def generate_trow_configuration(registries: list[RegistryConfig]) -> dict:
                     "authorizationToken"
                 ]
 
+            decoded_token = base64.b64decode(auth_token).decode("utf-8")
+            username, password = decoded_token.split(":")
             trow_configuration["registry_proxies"]["registries"].append(
                 {
                     "alias": registry.alias,
                     "host": registry.host,
-                    "username": "AWS",
-                    "password": auth_token,
+                    "username": username,
+                    "password": password,
                 },
             )
 
