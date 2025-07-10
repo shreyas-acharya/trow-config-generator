@@ -1,5 +1,10 @@
-"""Generate the trow configuration."""
+"""Generate Trow configuration from registry definitions.
 
+Supports Docker, ECR, and ECR Public registries with appropriate
+authentication.
+"""
+
+import logging
 import os
 from pathlib import Path
 
@@ -7,39 +12,66 @@ import boto3
 
 from trow_config.configuration import RegistryConfig, RegistryType
 
+logger = logging.getLogger(__name__)
+
 
 def _retrieve_value(configuration: dict) -> str:
-    """Retrieve the value from the configuration."""
+    """Retrieve configuration value from direct value, file, or environment.
+
+    Args:
+        configuration: Dict with one of: 'value', 'file', 'env'
+
+    Returns:
+        The resolved value as string
+
+    """
     if len(configuration) != 1:
-        error = ValueError(
-            "Invalid configuration. Exactly one value from the following"
-            " keys must be provided: value, file, env",
+        raise ValueError(
+            "Configuration must have exactly one key: value, file, or env",
         )
-        raise error
 
     if "value" in configuration:
         return configuration["value"]
+
     if "file" in configuration:
         with Path.open(
             Path(configuration["file"]),
             encoding="utf-8",
         ) as file:
-            return file.read()
+            return file.read().strip()
+
     if "env" in configuration:
         return os.environ[configuration["env"]]
 
-    error = ValueError("Invalid configuration. Unknown option.")
-    raise error
+    raise ValueError("Unknown configuration option")
 
 
 def generate_trow_configuration(registries: list[RegistryConfig]) -> dict:
-    """Generate the trow configuration."""
+    """Generate Trow configuration from registry list.
+
+    Args:
+        registries: List of registry configurations
+
+    Returns:
+        Dict containing Trow configuration
+
+    """
+    logger.info("Processing %d registries", len(registries))
+
     trow_configuration: dict = {
         "registry_proxies": {"registries": []},
         "image_validation": {"default": "Allow", "allow": [], "deny": []},
     }
+
     for registry in registries:
+        logger.info(
+            "Processing registry: %s (%s)",
+            registry.alias,
+            registry.registry_type,
+        )
+
         if registry.registry_type == RegistryType.DOCKER:
+            # Standard Docker registry authentication
             trow_configuration["registry_proxies"]["registries"].append(
                 {
                     "alias": registry.alias,
@@ -52,12 +84,18 @@ def generate_trow_configuration(registries: list[RegistryConfig]) -> dict:
                     ),
                 },
             )
+
         elif registry.registry_type in [
             RegistryType.ECR_PUBLIC,
             RegistryType.ECR,
         ]:
+            # AWS ECR authentication via IAM role assumption
+            logger.debug("Assuming AWS role for %d", registry.alias)
+
             credentials = boto3.client("sts").assume_role_with_web_identity(
-                RoleArn=_retrieve_value(registry.auth_configuration["role_arn"]),
+                RoleArn=_retrieve_value(
+                    registry.auth_configuration["role_arn"],
+                ),
                 RoleSessionName=_retrieve_value(
                     registry.auth_configuration["role_session_name"],
                 ),
@@ -67,43 +105,66 @@ def generate_trow_configuration(registries: list[RegistryConfig]) -> dict:
             )
 
             if registry.registry_type == RegistryType.ECR_PUBLIC:
+                # ECR Public authentication
                 client = boto3.client(
                     "ecr-public",
-                    region_name=_retrieve_value(registry.auth_configuration["region"]),
-                    aws_access_key_id=credentials["Credentials"]["AccessKeyId"],
-                    aws_secret_access_key=credentials["Credentials"]["SecretAccessKey"],
-                    aws_session_token=credentials["Credentials"]["SessionToken"],
+                    region_name=_retrieve_value(
+                        registry.auth_configuration["region"],
+                    ),
+                    aws_access_key_id=credentials["Credentials"][
+                        "AccessKeyId"
+                    ],
+                    aws_secret_access_key=credentials["Credentials"][
+                        "SecretAccessKey"
+                    ],
+                    aws_session_token=credentials["Credentials"][
+                        "SessionToken"
+                    ],
                 )
                 response = client.get_authorization_token()
-                trow_configuration["registry_proxies"]["registries"].append(
-                    {
-                        "alias": registry.alias,
-                        "host": registry.host,
-                        "username": "AWS",
-                        "password": response["authorizationData"]["authorizationToken"],
-                    },
-                )
+                auth_token = response["authorizationData"][
+                    "authorizationToken"
+                ]
+
             else:
+                # ECR Private authentication
                 client = boto3.client(
                     "ecr",
-                    region_name=_retrieve_value(registry.auth_configuration["region"]),
-                    aws_access_key_id=credentials["Credentials"]["AccessKeyId"],
-                    aws_secret_access_key=credentials["Credentials"]["SecretAccessKey"],
-                    aws_session_token=credentials["Credentials"]["SessionToken"],
+                    region_name=_retrieve_value(
+                        registry.auth_configuration["region"],
+                    ),
+                    aws_access_key_id=credentials["Credentials"][
+                        "AccessKeyId"
+                    ],
+                    aws_secret_access_key=credentials["Credentials"][
+                        "SecretAccessKey"
+                    ],
+                    aws_session_token=credentials["Credentials"][
+                        "SessionToken"
+                    ],
                 )
                 response = client.get_authorization_token(
                     registryIds=[
-                        _retrieve_value(registry.auth_configuration["registry_id"]),
+                        _retrieve_value(
+                            registry.auth_configuration["registry_id"],
+                        ),
                     ],
                 )
-                trow_configuration["registry_proxies"]["registries"].append(
-                    {
-                        "alias": registry.alias,
-                        "host": registry.host,
-                        "username": "AWS",
-                        "password": response["authorizationData"][0][
-                            "authorizationToken"
-                        ],
-                    },
-                )
+                auth_token = response["authorizationData"][0][
+                    "authorizationToken"
+                ]
+
+            trow_configuration["registry_proxies"]["registries"].append(
+                {
+                    "alias": registry.alias,
+                    "host": registry.host,
+                    "username": "AWS",
+                    "password": auth_token,
+                },
+            )
+
+    logger.info(
+        "Generated configuration for %d registries",
+        len(trow_configuration["registry_proxies"]["registries"]),
+    )
     return trow_configuration

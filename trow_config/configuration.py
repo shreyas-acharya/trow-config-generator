@@ -1,4 +1,7 @@
-"""Configuration for the Trow Configuration App."""
+"""Configuration models for the Trow Configuration Generator.
+
+Defines Pydantic models for registry configurations and application settings.
+"""
 
 from enum import Enum
 from typing import Annotated
@@ -7,6 +10,7 @@ from pydantic import BaseModel, BeforeValidator, Field
 
 
 def _split_comma_seperated_dictionary(value: str) -> dict[str, str]:
+    """Parse comma-separated string into dictionary."""
     items: dict[str, str] = {}
     for item in value.split(","):
         parts: list[str] = item.strip().split(":")
@@ -15,7 +19,7 @@ def _split_comma_seperated_dictionary(value: str) -> dict[str, str]:
 
 
 class RegistryType(str, Enum):
-    """Registry type."""
+    """Supported registry types."""
 
     DOCKER = "docker"
     ECR_PUBLIC = "ecr-public"
@@ -23,7 +27,7 @@ class RegistryType(str, Enum):
 
 
 class RegistryConfig(BaseModel):
-    """Configuration for a registry."""
+    """Registry configuration model."""
 
     alias: str = Field(description="Registry alias")
     host: str = Field(description="Registry host")
@@ -38,7 +42,13 @@ class RegistryConfig(BaseModel):
 
 
 class Config(BaseModel):
-    """Configuration for the Trow Configuration App."""
+    """Application configuration from environment variables."""
+
+    LOG_LEVEL: str = Field(
+        default="INFO",
+        pattern=r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$",
+        description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
+    )
 
     CONFIGURATION_FILE_PATH: str = Field(
         default="config.yaml",
