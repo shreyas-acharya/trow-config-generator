@@ -24,6 +24,7 @@ class RegistryType(str, Enum):
     DOCKER = "docker"
     ECR_PUBLIC = "ecr-public"
     ECR = "ecr"
+    GHCR = "ghcr"
 
 
 class RegistryConfig(BaseModel):
